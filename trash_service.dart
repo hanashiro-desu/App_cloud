@@ -164,9 +164,12 @@ class TrashService {
         // update UI ngay
         trashFilesNotifier.value = [...trashFilesNotifier.value, entry];
 
-        final index = await _loadIndex();
-        (index["files"] as List).add(entry);
-        await _saveIndex(index);
+        final indexFuture = _loadIndex();
+        final saveFuture = indexFuture.then((index) async {
+          (index["files"] as List).add(entry);
+          await _saveIndex(index);
+        });
+        await Future.wait([saveFuture]);
         return id;
       }
     } catch (e, st) {
@@ -215,12 +218,14 @@ class TrashService {
       }
     }
 
-    await restoreRecursively(entry);
-
-    // ✅ Xoá ngay trên notifier (UI mất tức thì)
+    // ✅ Gỡ khỏi notifier trước — UI mất ngay
     final current = List<Map<String, dynamic>>.from(trashFilesNotifier.value);
     current.removeWhere((f) => f["id"] == id);
     trashFilesNotifier.value = current;
+
+    // Sau đó mới chạy restoreRecursively(entry);
+    await restoreRecursively(entry);
+
 
     // Sau đó cập nhật index.json
     files.removeAt(idx);
@@ -239,33 +244,47 @@ class TrashService {
 
     final entry = Map<String, dynamic>.from(files[idx] as Map);
 
+    // Thu thập tất cả đường dẫn trong thư mục (nếu cần), sau đó xoá batch
     Future<void> deleteRecursively(Map<String, dynamic> e) async {
       if (e["type"] == "file") {
         try {
           await _client.storage.from(bucket).remove([e["trashPath"]]);
         } catch (_) {}
       } else if (e["type"] == "folder") {
-        final children = (e["children"] as List?) ?? [];
-        for (var c in children) {
-          await deleteRecursively(Map<String, dynamic>.from(c));
+        final allPaths = <String>[];
+        void collect(Map<String, dynamic> node) {
+          if (node["type"] == "file") {
+            allPaths.add(node["trashPath"]);
+          } else {
+            for (var c in (node["children"] as List? ?? [])) {
+              collect(Map<String, dynamic>.from(c));
+            }
+          }
+        }
+
+        collect(e);
+        if (allPaths.isNotEmpty) {
+          try {
+            await _client.storage.from(bucket).remove(allPaths);
+          } catch (_) {}
         }
       }
     }
 
     await deleteRecursively(entry);
 
-    // ✅ Cập nhật ngay notifier (UI biến mất lập tức)
+    // Cập nhật notifier & index.json
     final current = List<Map<String, dynamic>>.from(trashFilesNotifier.value);
     current.removeWhere((f) => f["id"] == id);
     trashFilesNotifier.value = current;
 
-    // Cập nhật index.json trên Supabase
     files.removeAt(idx);
     index['files'] = files;
     await _saveIndex(index);
 
     return true;
   }
+
 
   /// Dọn thùng rác sau 30 ngày
   Future<void> autoCleanTrash() async {

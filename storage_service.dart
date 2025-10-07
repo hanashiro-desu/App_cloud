@@ -193,11 +193,13 @@ class StorageService {
 
   Future<bool> createFolder(String parentPath, String folderName) async {
     try {
-      final folderPath = parentPath.isEmpty ? folderName : '$parentPath/$folderName';
+      final folderPath =
+      parentPath.isEmpty ? folderName : '$parentPath/$folderName';
       final markerPath = '$folderPath/.keep';
 
-      // 1️⃣ Tạo file rỗng .keep trong Storage
-      final tmp = File('${Directory.systemTemp.path}/.keep_${DateTime.now().millisecondsSinceEpoch}');
+      // 1️⃣ Tạo file .keep trong Storage
+      final tmp = File(
+          '${Directory.systemTemp.path}/.keep_${DateTime.now().millisecondsSinceEpoch}');
       await tmp.writeAsBytes(Uint8List(0));
       final ok = await uploadFile(tmp, markerPath);
       try {
@@ -208,25 +210,25 @@ class StorageService {
 
       // 2️⃣ Ghi thông tin thư mục vào database
       final folderNameOnly = folderName.trim();
-      final response = await SupabaseManager.supabase.from('folders').insert({
-        'name': folderNameOnly,
-        'parent_id': null, // có thể thay bằng id thư mục cha nếu cần
-        'is_deleted': false,
-      });
 
-      if (response.error != null) {
-        print('insert folder error: ${response.error!.message}');
+      try {
+        await SupabaseManager.supabase.from('folders').insert({
+          'name': folderNameOnly,
+          'parent_id': null, // có thể thay bằng id thư mục cha nếu cần
+          'is_deleted': false,
+        });
+        print('✅ Folder "$folderNameOnly" created successfully in DB');
+      } catch (error) {
+        print('insert folder error: $error');
         return false;
       }
 
-      print('✅ Folder "$folderNameOnly" created successfully in DB');
       return true;
     } catch (e) {
       print('createFolder error: $e');
       return false;
     }
   }
-
 
   Future<bool> _isFolder(String path) async {
     try {

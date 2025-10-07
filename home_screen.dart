@@ -189,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
       String dest = currentPath.isEmpty ? name : "$currentPath/$name";
       dest = await _getUniqueFileName(dest);
 
-      final ok = await _withLoading(() => storage.createFolder(dest, ""));
+      final ok = await _withLoading(() => storage.createFolder("", dest));
       _show(ok ? 'Tạo folder thành công' : 'Tạo folder thất bại');
       if (ok) _load();
     }
@@ -230,15 +230,10 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Chuyển vào thùng rác'),
-        content:
-        Text("Bạn có chắc muốn chuyển '${item['name']}' vào thùng rác?"),
+        content: Text("Bạn có chắc muốn chuyển '${item['name']}' vào thùng rác?"),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('Hủy')),
-          TextButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('Đồng ý')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Đồng ý')),
         ],
       ),
     );
@@ -247,10 +242,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final path = item['path'] as String;
     debugPrint("DEBUG DELETE path=$path");
     try {
+      // moveToTrash trả về id (String?) hoặc null khi thất bại
       final id = await _withLoading(() => trashService.moveToTrash(path));
       if (id != null) {
         _show('Đã chuyển vào thùng rác');
-        _load();
+        await _load(); // chỉ load lại khi thao tác thành công
       } else {
         _show('Chuyển vào thùng rác thất bại');
       }
@@ -258,6 +254,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _show('Chuyển vào thùng rác thất bại: $e');
     }
   }
+
+
 
   Future<void> _move(Map<String, dynamic> item) async {
     final dest = await Navigator.push<String>(
