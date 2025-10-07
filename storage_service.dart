@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_client.dart';
+
 
 class StorageService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -159,16 +161,30 @@ class StorageService {
 
   Future<bool> uploadFile(File file, String destPath) async {
     try {
+      // Thử upload file lên Supabase Storage
       try {
         await _client.storage.from(bucket).upload(destPath, file);
-        return true;
       } catch (_) {
+        // Nếu file đã tồn tại, xóa rồi upload lại
         try {
           await _client.storage.from(bucket).remove([destPath]);
         } catch (_) {}
         await _client.storage.from(bucket).upload(destPath, file);
-        return true;
       }
+
+      // === Ghi metadata vào bảng "files" ===
+      final fileName = p.basename(destPath);
+      final fileSize = await file.length();
+
+      await _client.from('files').insert({
+        'name': fileName,
+        'path': destPath,
+        'size': fileSize,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      print('✅ File uploaded and metadata saved: $fileName');
+      return true;
     } catch (e) {
       print('uploadFile error: $e');
       return false;
@@ -179,18 +195,38 @@ class StorageService {
     try {
       final folderPath = parentPath.isEmpty ? folderName : '$parentPath/$folderName';
       final markerPath = '$folderPath/.keep';
+
+      // 1️⃣ Tạo file rỗng .keep trong Storage
       final tmp = File('${Directory.systemTemp.path}/.keep_${DateTime.now().millisecondsSinceEpoch}');
       await tmp.writeAsBytes(Uint8List(0));
       final ok = await uploadFile(tmp, markerPath);
       try {
         await tmp.delete();
       } catch (_) {}
-      return ok;
+
+      if (!ok) return false;
+
+      // 2️⃣ Ghi thông tin thư mục vào database
+      final folderNameOnly = folderName.trim();
+      final response = await SupabaseManager.supabase.from('folders').insert({
+        'name': folderNameOnly,
+        'parent_id': null, // có thể thay bằng id thư mục cha nếu cần
+        'is_deleted': false,
+      });
+
+      if (response.error != null) {
+        print('insert folder error: ${response.error!.message}');
+        return false;
+      }
+
+      print('✅ Folder "$folderNameOnly" created successfully in DB');
+      return true;
     } catch (e) {
       print('createFolder error: $e');
       return false;
     }
   }
+
 
   Future<bool> _isFolder(String path) async {
     try {
