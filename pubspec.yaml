@@ -1,0 +1,57 @@
+name: my_new_app
+description: "A new Flutter project."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase & Authentication
+  supabase_flutter: ^2.10.2
+  google_sign_in: ^6.1.5
+  flutter_secure_storage: ^9.0.0
+
+  # State Management
+  flutter_riverpod: ^2.0.0
+
+  # UI & Styling
+  google_fonts: ^6.2.1
+  sign_in_button: ^3.2.0
+  font_awesome_flutter: ^10.7.0
+  flutter_animate: ^4.5.0
+  cupertino_icons: ^1.0.8
+
+  # Environment Variables
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/google_logo.png
+    - assets/icons/github_logo.png
+    - assets/icons/logo.png
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Black.ttf
+          weight: 900
+        - asset: assets/fonts/Poppins-BlackItalic.ttf
+          weight: 900
+          style: italic
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
